@@ -1,67 +1,65 @@
-"""News-image entry for 25 November 2026.
+#!/usr/bin/env python3
+"""Deliver the 2026-11-25 news-image entry.
 
-This program ships the finished collage, ``entry.png``, to the directory
-the grader reads from. It performs no drawing, no downloading and no
-random work: it copies one fixed file, byte for byte, so every run
-produces exactly the same output.
+The finished picture lives beside this file as entry.png. This script
+only moves those bytes into the grading folder. Nothing is drawn,
+fetched, or randomised here, so the result is identical on every run.
 """
-
-from __future__ import annotations
 
 import os
 import shutil
 import sys
 from pathlib import Path
 
-IMAGE_FILENAME = "entry.png"
+ENTRY_NAME = "entry.png"
+DEFAULT_OUT = "/output"
 
 
-def locate_collage() -> Path:
-    """Return the collage bundled next to this script."""
-    here = Path(__file__).resolve().parent
-    candidate = here / IMAGE_FILENAME
-    if not candidate.is_file():
+def bundled_picture() -> Path:
+    folder = Path(__file__).resolve().parent
+    picture = folder / ENTRY_NAME
+    if not picture.is_file():
         raise FileNotFoundError(
-            f"Missing bundled image: expected {candidate} next to main.py, "
-            "but no such file was found. The entry cannot be produced "
-            "without it."
+            f"bundled picture {picture} is missing; "
+            "the entry cannot be built without it"
         )
-    return candidate
+    return picture
 
 
-def locate_target_dir() -> Path:
-    """Return the grader output directory from the environment."""
-    raw = os.environ.get("MAKEFUN_OUTPUT_DIR", "/output")
-    target = Path(raw).expanduser()
-    return target
+def out_folder() -> Path:
+    wanted = os.environ.get("MAKEFUN_OUTPUT_DIR") or DEFAULT_OUT
+    return Path(wanted).expanduser()
 
 
-def publish_collage() -> Path:
-    """Copy the bundled collage to the output directory and return its path."""
-    source = locate_collage()
-    destination_dir = locate_target_dir()
-    destination_dir.mkdir(parents=True, exist_ok=True)
-    destination = destination_dir / IMAGE_FILENAME
-    # copyfile moves bytes only: no timestamps, metadata or randomness
-    # leak into the result, so repeated runs stay identical. The output
-    # is deterministic because the source file is fixed and nothing in
-    # this program depends on the clock, the network or random data.
-    shutil.copyfile(source, destination)
-    return destination
+def deliver() -> Path:
+    origin = bundled_picture()
+    folder = out_folder()
+    folder.mkdir(parents=True, exist_ok=True)
+    result = folder / ENTRY_NAME
+    shutil.copyfile(origin, result)
+    # Confirm the copy is complete before reporting success: a short
+    # or truncated write must fail loudly instead of shipping a
+    # corrupt entry to the grader.
+    if result.stat().st_size != origin.stat().st_size:
+        raise OSError(
+            f"copied {result} has {result.stat().st_size} bytes, "
+            f"expected {origin.stat().st_size}"
+        )
+    return result
 
 
-def main() -> int:
+def run() -> int:
     try:
-        written = publish_collage()
-    except FileNotFoundError as exc:
-        print(f"error: {exc}", file=sys.stderr)
+        placed = deliver()
+    except FileNotFoundError as problem:
+        print(f"error: {problem}", file=sys.stderr)
         return 1
-    except OSError as exc:
-        print(f"error: could not write the entry image: {exc}", file=sys.stderr)
+    except OSError as problem:
+        print(f"error: failed to write the entry: {problem}", file=sys.stderr)
         return 1
-    print(f"Wrote {written}")
+    print(f"Wrote {placed}")
     return 0
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    raise SystemExit(run())
